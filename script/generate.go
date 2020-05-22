@@ -5,6 +5,7 @@
 package main
 
 import (
+	"archive/tar"
 	"bufio"
 	"bytes"
 	"fmt"
@@ -14,6 +15,8 @@ import (
 	"log"
 	"net/http"
 	"strings"
+
+	"github.com/ulikunitz/xz"
 )
 
 type rrange struct {
@@ -181,21 +184,32 @@ func main() {
 
 	fmt.Fprint(f, "package runewidth\n\n")
 
-	resp, err := http.Get("https://unicode.org/Public/12.1.0/ucd/EastAsianWidth.txt")
+	resp, err := http.Get("https://github.com/waltarix/neovim/releases/download/unicode%2F13.0.0/unicode.tar.xz")
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer resp.Body.Close()
 
-	eastasian(f, resp.Body)
-
-	resp, err = http.Get("https://unicode.org/Public/emoji/12.1/emoji-data.txt")
+	xzReader, err := xz.NewReader(resp.Body)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("NewReader error %s", err)
 	}
-	defer resp.Body.Close()
 
-	emoji(f, resp.Body)
+	tarReader := tar.NewReader(xzReader)
+	for true {
+		header, err := tarReader.Next()
+
+		if err == io.EOF {
+			break
+		}
+
+		switch header.Name {
+		case "unicode/EastAsianWidth.txt":
+			eastasian(f, tarReader)
+		case "unicode/emoji-data.txt":
+			emoji(f, tarReader)
+		}
+	}
 
 	out, err := format.Source(f.Bytes())
 	if err != nil {
