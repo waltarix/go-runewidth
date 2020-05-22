@@ -3,7 +3,6 @@
 package runewidth
 
 import (
-	"crypto/sha256"
 	"fmt"
 	"os"
 	"sort"
@@ -35,34 +34,6 @@ type tableInfo struct {
 	name    string
 	wantN   int
 	wantSHA string
-}
-
-var tables = []tableInfo{
-	{private, "private", 137468, "a4a641206dc8c5de80bd9f03515a54a706a5a4904c7684dc6a33d65c967a51b2"},
-	{nonprint, "nonprint", 2143, "288904683eb225e7c4c0bd3ee481b53e8dace404ec31d443afdbc4d13729fe95"},
-	{combining, "combining", 465, "3cce13deb5e23f9f7327f2b1ef162328285a7dcf277a98302a8f7cdd43971268"},
-	{doublewidth, "doublewidth", 182440, "3d16eda8650dc2c92d6318d32f0b4a74fda5a278db2d4544b1dd65863394823c"},
-	{ambiguous, "ambiguous", 138739, "d05e339a10f296de6547ff3d6c5aee32f627f6555477afebd4a3b7e3cf74c9e3"},
-	{emoji, "emoji", 3535, "9ec17351601d49c535658de8d129c1d0ccda2e620669fc39a2faaee7dedcef6d"},
-	{notassigned, "notassigned", 10, "68441e98eca1450efbe857ac051fcc872eed347054dfd0bc662d1c4ee021d69f"},
-	{neutral, "neutral", 27333, "5455f5e75c307f70b4e9b2384dc5a8bcd91a4c5e2b24b2b185dfad4d860ee5c2"},
-}
-
-func TestTableChecksums(t *testing.T) {
-	for _, ti := range tables {
-		gotN := 0
-		buf := make([]byte, utf8.MaxRune+1)
-		for r := rune(0); r <= utf8.MaxRune; r++ {
-			if inTable(r, ti.tbl) {
-				gotN++
-				buf[r] = 1
-			}
-		}
-		gotSHA := fmt.Sprintf("%x", sha256.Sum256(buf))
-		if gotN != ti.wantN || gotSHA != ti.wantSHA {
-			t.Errorf("table = %s,\n\tn = %d want %d,\n\tsha256 = %s want %s", ti.name, gotN, ti.wantN, gotSHA, ti.wantSHA)
-		}
-	}
 }
 
 func checkInterval(first, last rune) bool {
@@ -122,18 +93,6 @@ func printCompactTable(tbl table) {
 	fmt.Printf("\n\n")
 }
 
-func TestSorted(t *testing.T) {
-	for _, ti := range tables {
-		if !sort.IsSorted(&ti.tbl) {
-			t.Errorf("table not sorted: %s", ti.name)
-		}
-		if !isCompact(t, &ti) {
-			t.Errorf("table not compact: %s", ti.name)
-			//printCompactTable(ti.tbl)
-		}
-	}
-}
-
 var runewidthtests = []struct {
 	in    rune
 	out   int
@@ -144,26 +103,28 @@ var runewidthtests = []struct {
 	{'ｾ', 1, 1},
 	{'ｶ', 1, 1},
 	{'ｲ', 1, 1},
-	{'☆', 1, 2}, // double width in ambiguous
+	{'☆', 2, 2}, // double width in ambiguous
 	{'☺', 1, 1},
 	{'☻', 1, 1},
-	{'♥', 1, 2},
+	{'♥', 2, 2},
 	{'♦', 1, 1},
-	{'♣', 1, 2},
-	{'♠', 1, 2},
-	{'♂', 1, 2},
-	{'♀', 1, 2},
-	{'♪', 1, 2},
+	{'♣', 2, 2},
+	{'♠', 2, 2},
+	{'♂', 2, 2},
+	{'♀', 2, 2},
+	{'♪', 2, 2},
 	{'♫', 1, 1},
 	{'☼', 1, 1},
-	{'↕', 1, 2},
+	{'↕', 2, 2},
 	{'‼', 1, 1},
-	{'↔', 1, 2},
+	{'↔', 2, 2},
 	{'\x00', 0, 0},
 	{'\x01', 0, 0},
 	{'\u0300', 0, 0},
-	{'\u2028', 0, 0},
-	{'\u2029', 0, 0},
+	{'\u2028', -1, -1},
+	{'\u2029', -1, -1},
+	{'\u2580', 1, 1}, // UPPER HALF BLOCK: ▀
+	{'\uE0A0', 1, 1}, // powerline symbol: 
 }
 
 func TestRuneWidth(t *testing.T) {
@@ -182,54 +143,14 @@ func TestRuneWidth(t *testing.T) {
 	}
 }
 
-var isambiguouswidthtests = []struct {
-	in  rune
-	out bool
-}{
-	{'世', false},
-	{'■', true},
-	{'界', false},
-	{'○', true},
-	{'㈱', false},
-	{'①', true},
-	{'②', true},
-	{'③', true},
-	{'④', true},
-	{'⑤', true},
-	{'⑥', true},
-	{'⑦', true},
-	{'⑧', true},
-	{'⑨', true},
-	{'⑩', true},
-	{'⑪', true},
-	{'⑫', true},
-	{'⑬', true},
-	{'⑭', true},
-	{'⑮', true},
-	{'⑯', true},
-	{'⑰', true},
-	{'⑱', true},
-	{'⑲', true},
-	{'⑳', true},
-	{'☆', true},
-}
-
-func TestIsAmbiguousWidth(t *testing.T) {
-	for _, tt := range isambiguouswidthtests {
-		if out := IsAmbiguousWidth(tt.in); out != tt.out {
-			t.Errorf("IsAmbiguousWidth(%q) = %v, want %v", tt.in, out, tt.out)
-		}
-	}
-}
-
 var stringwidthtests = []struct {
 	in    string
 	out   int
 	eaout int
 }{
-	{"■㈱の世界①", 10, 12},
-	{"スター☆", 7, 8},
-	{"つのだ☆HIRO", 11, 12},
+	{"■㈱の世界①", 11, 11},
+	{"スター☆", 8, 8},
+	{"つのだ☆HIRO", 12, 12},
 }
 
 func TestStringWidth(t *testing.T) {
@@ -331,27 +252,6 @@ func TestTruncateNoNeeded(t *testing.T) {
 	}
 }
 
-var isneutralwidthtests = []struct {
-	in  rune
-	out bool
-}{
-	{'→', false},
-	{'┊', false},
-	{'┈', false},
-	{'～', false},
-	{'└', false},
-	{'⣀', true},
-	{'⣀', true},
-}
-
-func TestIsNeutralWidth(t *testing.T) {
-	for _, tt := range isneutralwidthtests {
-		if out := IsNeutralWidth(tt.in); out != tt.out {
-			t.Errorf("IsNeutralWidth(%q) = %v, want %v", tt.in, out, tt.out)
-		}
-	}
-}
-
 func TestFillLeft(t *testing.T) {
 	s := "あxいうえお"
 	expected := "    あxいうえお"
@@ -410,10 +310,10 @@ func TestZeroWidthJoiner(t *testing.T) {
 		{"👩", 2},
 		{"👩‍", 2},
 		{"👩‍🍳", 2},
-		{"‍🍳", 2},
+		{"‍🍳", 1},
 		{"👨‍👨", 2},
 		{"👨‍👨‍👧", 2},
-		{"🏳️‍🌈", 1},
+		{"🏳️‍🌈", 2},
 		{"あ👩‍🍳い", 6},
 		{"あ‍🍳い", 6},
 		{"あ‍い", 4},
