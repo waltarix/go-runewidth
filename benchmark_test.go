@@ -11,11 +11,10 @@ var benchSink int
 // RuneWidth
 //
 
-func benchRuneWidth(b *testing.B, eastAsianWidth bool, start, stop rune, want int) int {
+func benchRuneWidth(b *testing.B, start, stop rune, want int) int {
 	n := 0
 	got := -1
 	c := NewCondition()
-	c.EastAsianWidth = eastAsianWidth
 	for i := 0; i < b.N; i++ {
 		got = n
 		for r := start; r < stop; r++ {
@@ -29,27 +28,20 @@ func benchRuneWidth(b *testing.B, eastAsianWidth bool, start, stop rune, want in
 	return n
 }
 func BenchmarkRuneWidthAll(b *testing.B) {
-	benchSink = benchRuneWidth(b, false, 0, utf8.MaxRune+1, 1293932)
+	benchSink = benchRuneWidth(b, 0, utf8.MaxRune+1, 1430597)
 }
 func BenchmarkRuneWidth768(b *testing.B) {
-	benchSink = benchRuneWidth(b, false, 0, 0x300, 702)
-}
-func BenchmarkRuneWidthAllEastAsian(b *testing.B) {
-	benchSink = benchRuneWidth(b, true, 0, utf8.MaxRune+1, 1432558)
-}
-func BenchmarkRuneWidth768EastAsian(b *testing.B) {
-	benchSink = benchRuneWidth(b, true, 0, 0x300, 794)
+	benchSink = benchRuneWidth(b, 0, 0x300, 715)
 }
 
 //
 // String1Width - strings which consist of a single rune
 //
 
-func benchString1Width(b *testing.B, eastAsianWidth bool, start, stop rune, want int) int {
+func benchString1Width(b *testing.B, start, stop rune, want int) int {
 	n := 0
 	got := -1
 	c := NewCondition()
-	c.EastAsianWidth = eastAsianWidth
 	for i := 0; i < b.N; i++ {
 		got = n
 		for r := start; r < stop; r++ {
@@ -64,26 +56,20 @@ func benchString1Width(b *testing.B, eastAsianWidth bool, start, stop rune, want
 	return n
 }
 func BenchmarkString1WidthAll(b *testing.B) {
-	benchSink = benchString1Width(b, false, 0, utf8.MaxRune+1, 1295980)
+	benchSink = benchString1Width(b, 0, utf8.MaxRune+1, 1434693)
 }
 func BenchmarkString1Width768(b *testing.B) {
-	benchSink = benchString1Width(b, false, 0, 0x300, 702)
-}
-func BenchmarkString1WidthAllEastAsian(b *testing.B) {
-	benchSink = benchString1Width(b, true, 0, utf8.MaxRune+1, 1436654)
-}
-func BenchmarkString1Width768EastAsian(b *testing.B) {
-	benchSink = benchString1Width(b, true, 0, 0x300, 794)
+	benchSink = benchString1Width(b, 0, 0x300, 715)
 }
 
 //
 // tables
 //
-func benchTable(b *testing.B, tbl table) int {
+func benchTable(b *testing.B) int {
 	n := 0
 	for i := 0; i < b.N; i++ {
 		for r := rune(0); r <= utf8.MaxRune; r++ {
-			if inTable(r, tbl) {
+			if wcwidth9_width(r) >= -1 {
 				n++
 			}
 		}
@@ -91,27 +77,6 @@ func benchTable(b *testing.B, tbl table) int {
 	return n
 }
 
-func BenchmarkTablePrivate(b *testing.B) {
-	benchSink = benchTable(b, private)
-}
-func BenchmarkTableNonprint(b *testing.B) {
-	benchSink = benchTable(b, nonprint)
-}
-func BenchmarkTableCombining(b *testing.B) {
-	benchSink = benchTable(b, combining)
-}
-func BenchmarkTableDoublewidth(b *testing.B) {
-	benchSink = benchTable(b, doublewidth)
-}
-func BenchmarkTableAmbiguous(b *testing.B) {
-	benchSink = benchTable(b, ambiguous)
-}
-func BenchmarkTableEmoji(b *testing.B) {
-	benchSink = benchTable(b, emoji)
-}
-func BenchmarkTableNarrow(b *testing.B) {
-	benchSink = benchTable(b, narrow)
-}
-func BenchmarkTableNeutral(b *testing.B) {
-	benchSink = benchTable(b, neutral)
+func BenchmarkTableWcwidth9(b *testing.B) {
+	benchSink = benchTable(b)
 }
