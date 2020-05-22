@@ -36,51 +36,32 @@ func handleEnv() {
 type interval struct {
 	first rune
 	last  rune
+	width int
 }
 
 type table []interval
 
-func inTables(r rune, ts ...table) bool {
-	for _, t := range ts {
-		if inTable(r, t) {
-			return true
-		}
-	}
-	return false
-}
-
-func inTable(r rune, t table) bool {
-	if r < t[0].first {
-		return false
+func wcwidth9_width(r rune) int {
+	if r < wcwidth9_table[0].first {
+		return 1
 	}
 
 	bot := 0
-	top := len(t) - 1
+	top := wcwidth9_table_length
 	for top >= bot {
 		mid := (bot + top) >> 1
 
 		switch {
-		case t[mid].last < r:
+		case wcwidth9_table[mid].last < r:
 			bot = mid + 1
-		case t[mid].first > r:
+		case wcwidth9_table[mid].first > r:
 			top = mid - 1
 		default:
-			return true
+			return wcwidth9_table[mid].width
 		}
 	}
 
-	return false
-}
-
-var private = table{
-	{0x00E000, 0x00F8FF}, {0x0F0000, 0x0FFFFD}, {0x100000, 0x10FFFD},
-}
-
-var nonprint = table{
-	{0x0000, 0x001F}, {0x007F, 0x009F}, {0x00AD, 0x00AD},
-	{0x070F, 0x070F}, {0x180B, 0x180E}, {0x200B, 0x200F},
-	{0x2028, 0x202E}, {0x206A, 0x206F}, {0xD800, 0xDFFF},
-	{0xFEFF, 0xFEFF}, {0xFFF9, 0xFFFB}, {0xFFFE, 0xFFFF},
+	return 1
 }
 
 // Condition have flag EastAsianWidth whether the current locale is CJK or not.
@@ -101,12 +82,18 @@ func NewCondition() *Condition {
 // See http://www.unicode.org/reports/tr11/
 func (c *Condition) RuneWidth(r rune) int {
 	switch {
-	case r < 0 || r > 0x10FFFF || inTables(r, nonprint, combining, notassigned):
+	case r == 0:
 		return 0
-	case (c.EastAsianWidth && IsAmbiguousWidth(r)) || inTables(r, doublewidth):
-		return 2
-	default:
+	case r < 0x20:
+		return 0
+	case r < 0x7F:
 		return 1
+	case r < 0xA0:
+		return 0
+	case r < 0 || r > 0x10FFFF:
+		return 0
+	default:
+		return wcwidth9_width(r)
 	}
 }
 
@@ -117,30 +104,8 @@ func (c *Condition) stringWidth(s string) (width int) {
 	return width
 }
 
-func (c *Condition) stringWidthZeroJoiner(s string) (width int) {
-	r1, r2 := rune(0), rune(0)
-	for _, r := range []rune(s) {
-		if r == 0xFE0E || r == 0xFE0F {
-			continue
-		}
-		w := c.RuneWidth(r)
-		if r2 == 0x200D && inTables(r, emoji) && inTables(r1, emoji) {
-			if width < w {
-				width = w
-			}
-		} else {
-			width += w
-		}
-		r1, r2 = r2, r
-	}
-	return width
-}
-
 // StringWidth return width as you can see
 func (c *Condition) StringWidth(s string) (width int) {
-	if c.ZeroWidthJoiner {
-		return c.stringWidthZeroJoiner(s)
-	}
 	return c.stringWidth(s)
 }
 
@@ -219,16 +184,6 @@ func (c *Condition) FillRight(s string, w int) string {
 // See http://www.unicode.org/reports/tr11/
 func RuneWidth(r rune) int {
 	return DefaultCondition.RuneWidth(r)
-}
-
-// IsAmbiguousWidth returns whether is ambiguous width or not.
-func IsAmbiguousWidth(r rune) bool {
-	return inTables(r, private, ambiguous)
-}
-
-// IsNeutralWidth returns whether is neutral width or not.
-func IsNeutralWidth(r rune) bool {
-	return inTable(r, neutral)
 }
 
 // StringWidth return width as you can see
